@@ -1,5 +1,13 @@
 {
     "files.associations": {
-        "raylib.h": "c"
-    }
+        "raylib.h": "c",
+        "raymath.h": "c"
+    },
+    "makefile.launchConfigurations": [
+        {
+            "cwd": "/Users/tucker/Documents/dev/plunge-game/bin",
+            "binaryPath": "/Users/tucker/Documents/dev/plunge-game/bin/build_osx",
+            "binaryArgs": []
+        }
+    ]
 }
