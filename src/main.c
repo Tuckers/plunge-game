@@ -120,14 +120,12 @@ int main(void)
     gates[6].position.y = 150;
     gates[7].position.y = 0;
 
-
+    SetTargetFPS(60);
     InitWindow(screenWidth, screenHeight, "plunge – game");
 
     Camera2D camera = {0};
     camera.rotation = 0.0f;
     camera.zoom = 1.0f;
-
-    SetTargetFPS(60);
 
     // MAIN LOOP ----------------------------------------------------------------------------------------//
     while (!WindowShouldClose()) // Detect window close button or ESC key
