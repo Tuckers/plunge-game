@@ -32,7 +32,6 @@ PLATFORM              ?= PLATFORM_DESKTOP
 PROJECT_NAME          ?= plunge
 PROJECT_VERSION       ?= 1.0
 PROJECT_BUILD_PATH    ?= .
-t
 RAYLIB_PATH           ?= ../../raylib
 
 # Locations of raylib.h and libraylib.a/libraylib.so
