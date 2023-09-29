@@ -1,99 +1,85 @@
 #include "../lib/raylib.h"
 #include "../lib/raymath.h"
+#include "definitions.h"
+#include "gate.h"
 
-#define MAX_GATES   100
-#define INERTIA     0.1f
-#define ROTATIONINERTIA 0.1f
-#define SCREENWIDTH 1080
-#define SCREENHEIGHT 1920
-#define SHIPWIDTH 36
-#define SHIPHEIGHT 48
-#define SHIPVERTICALPOSITION 340
-#define MAX_VELOCITY 100.0f
-
-typedef struct Gate {
-    Color color;
-    Vector2 position;
-    Vector2 velocity;
-    int gap;
-    int gapPosition;
-    int maxSpeed;
-    bool belowPlayer;
-    bool hit;
-} Gate;
-
-typedef struct Ship {
-    Vector2 position;
-    Vector2 velocity;
-    float rotation;
-    Color color;
-    Vector2 p1;
-    Vector2 p2;
-    Vector2 p3;
-} Ship;
-
-void DrawGate(Gate *gate)
-{
-    Color color = gate->hit ? RED : gate->color;
-    DrawRectangle( 0, gate->position.y, gate->gapPosition, 20, color );
-    DrawRectangle( gate->gapPosition + gate->gap, gate->position.y, SCREENWIDTH - (gate->gapPosition + gate->gap), 20, color );
-}
-
-void UpdateGate(Gate *gate)
-{
-    if (gate->position.y < 0)
-    {
-        gate->position.y = SCREENHEIGHT;
-        gate->belowPlayer = true;
-        gate->hit = false;
-    }
-    
-    // adjust gate velocity
-    if (gate->velocity.y > -10) gate->velocity.y -= 0.3f;
-    // update gate position
-    gate->position.y += gate->velocity.y;
-}
+int score = 0;
 
 void UpdateShip(Ship *ship)
 {
-    const float halfHeight = SHIPHEIGHT / 2;
-    const float halfWidth = SHIPWIDTH / 2;
+    const float halfHeight = (float)SHIPHEIGHT / 2;
+    const float halfWidth = (float)SHIPWIDTH / 2;
     const int rotationOffset = 0;
     // apply inertia
-    if (ship->velocity.x > 0.1f) ship->velocity.x -= INERTIA;
-    if (ship->velocity.x < -0.1f) ship->velocity.x += INERTIA;
+    if (ship->velocity.x > 0.1f)
+        ship->velocity.x -= INERTIA;
+    if (ship->velocity.x < -0.1f)
+        ship->velocity.x += INERTIA;
     // apply rotation inertia
-    if (ship->rotation > 0.1f) ship->rotation -= ROTATIONINERTIA;
-    if (ship->rotation < -0.1f) ship->rotation += ROTATIONINERTIA;
+    if (ship->rotation > 0.1f)
+        ship->rotation -= ROTATION_INERTIA;
+    if (ship->rotation < -0.1f)
+        ship->rotation += ROTATION_INERTIA;
     // add velocity to position
     ship->position.x += ship->velocity.x;
     // check for out of bounds
-    if (ship->position.x < (float)SHIPWIDTH / 2) ship->position.x = (float)SHIPWIDTH / 2;
-    if (ship->position.x > (float)SCREENWIDTH - SHIPWIDTH / 2) ship->position.x = (float)SCREENWIDTH - SHIPWIDTH / 2;
+    if (ship->position.x < (float)SHIPWIDTH / 2)
+        ship->position.x = (float)SHIPWIDTH / 2;
+    if (ship->position.x > (float)SCREENWIDTH - (float)SHIPWIDTH / 2)
+        ship->position.x = (float)SCREENWIDTH - (float)SHIPWIDTH / 2;
     // rotate triangle points
-    const Vector2 v1 = Vector2Rotate((Vector2){ -halfWidth, -halfHeight - rotationOffset }, DEG2RAD * ship->rotation);
-    const Vector2 v2 = Vector2Rotate((Vector2){ 0.0f, halfHeight - rotationOffset}, DEG2RAD * ship->rotation);
-    const Vector2 v3 = Vector2Rotate((Vector2){ halfWidth, -halfHeight - rotationOffset}, DEG2RAD * ship->rotation);
+    const Vector2 v1 = Vector2Rotate((Vector2){-halfWidth, -halfHeight - rotationOffset}, DEG2RAD * ship->rotation);
+    const Vector2 v2 = Vector2Rotate((Vector2){0.0f, halfHeight - rotationOffset}, DEG2RAD * ship->rotation);
+    const Vector2 v3 = Vector2Rotate((Vector2){halfWidth, -halfHeight - rotationOffset}, DEG2RAD * ship->rotation);
     // add position and update ship values
     ship->p1 = Vector2Add(v1, ship->position);
     ship->p2 = Vector2Add(v2, ship->position);
     ship->p3 = Vector2Add(v3, ship->position);
 }
 
-bool checkCollision(Gate *gate, Ship *ship){
-        Vector2 collisionPoint;
-        // check to see if left or right side of triangle contact gate
-        const bool leftCheck = CheckCollisionLines(ship->p1, ship->p2, gate->position, (Vector2){gate->gapPosition, gate->position.y}, &collisionPoint);
-        const bool rightCheck = CheckCollisionLines(ship->p3, ship->p2, (Vector2){gate->gapPosition + gate->gap, gate->position.y}, (Vector2){SCREENWIDTH, gate->position.y}, &collisionPoint);
-        return leftCheck || rightCheck;
-
+void UpdateLine(Line *line)
+{
+    line->p1.y -= 10;
+    line->p2.y -= 10;
+    if (line->p1.y < PLAY_PADDING)
+    {
+        line->p1.y = PLAY_HEIGHT + PLAY_PADDING;
+        line->p2.y = PLAY_HEIGHT + PLAY_PADDING;
+    }
 }
 
-void DrawShip(Ship *ship){
+void checkCollision(Gate *gate, Ship *ship)
+{
+    Vector2 collisionPoint;
+    // check to see if left or right side of triangle contact gate
+    const int topOfGate = gate->position.y + gate->height / 2;
+    const bool leftCheck = CheckCollisionLines(ship->p1, ship->p2, (Vector2){PLAY_PADDING, topOfGate}, (Vector2){gate->gapPosition, topOfGate}, &collisionPoint);
+    const bool rightCheck = CheckCollisionLines(ship->p3, ship->p2, (Vector2){gate->gapPosition + gate->gap, topOfGate}, (Vector2){PLAY_WIDTH + PLAY_PADDING, topOfGate}, &collisionPoint);
+    const bool collision = leftCheck || rightCheck;
+
+    if (collision && gate->belowPlayer)
+    {
+        gate->hit = true;
+        gate->belowPlayer = false;
+        score--;
+    }
+    if (gate->position.y < ship->position.y && gate->belowPlayer)
+    {
+        gate->belowPlayer = false;
+        score++;
+    }
+}
+
+void DrawShip(Ship *ship)
+{
     // Draw triangle
-    DrawTriangle( ship->p1, ship->p2, ship->p3, ship->color);
+    DrawTriangle(ship->p1, ship->p2, ship->p3, ship->color);
 }
 
+void DrawLineType(Line *line)
+{
+    DrawLineEx(line->p1, line->p2, 1, line->color);
+}
 
 // START -------------------------------------------------------------------------------------------------//
 
@@ -103,72 +89,90 @@ int main(void)
     const int screenHeight = SCREENHEIGHT;
     const int screenWidth = SCREENWIDTH;
     float distance = 0.0f;
-    int score = 0;
 
-    Ship playerShip = { 
-        {(float)screenWidth / 2 , SHIPVERTICALPOSITION},
-        {0.0f , 0.0f},
-        0.0f,
-        RED
-     };
+    Ship playerShip = {
+        MINT,
+        {(float)screenWidth / 2, SHIP_POSITION_Y},
+        {0.0f, 0.0f},
+        0.0f}; 
 
-    Gate gates[MAX_GATES] = { 0 };
+    Gate gates[MAX_GATES] = {0};
+    Line lines[MAX_LINES] = {0};
+
+    for (int i = 0; i < MAX_LINES; i++)
+    {
+        const int lineY = (PLAY_HEIGHT / (MAX_LINES)*i) + PLAY_PADDING;
+        lines[i].p1 = (Vector2){PLAY_PADDING, lineY};
+        lines[i].p2 = (Vector2){PLAY_WIDTH + PLAY_PADDING, lineY};
+        lines[i].color = LINE_COLOR;
+    }
 
     for (int i = 0; i < MAX_GATES; i++)
     {
-        gates[i].gap = (float)GetRandomValue(50, 200);
-        gates[i].gapPosition = (float)GetRandomValue(50, (screenWidth - gates[i].gap - 50));
-        gates[i].color = (Color){ GetRandomValue(200, 240), GetRandomValue(200, 240), GetRandomValue(200, 250), 255 };
-        gates[i].position.x = 0.0f;
-        gates[i].position.y = (float)screenHeight;
-        gates[i].velocity.x = 0.0f;
-        gates[i].velocity.y = 0.0f;
-        gates[i].belowPlayer = true;
-        gates[i].hit = false;
+        ResetGate(&gates[i]);
     }
+    gates[0].position.y = 400;
+    gates[1].position.y = 325;
+    gates[2].position.y = 275;
+    gates[3].position.y = 250;
+    gates[4].position.y = 225;
+    gates[5].position.y = 200;
+    gates[6].position.y = 150;
+    gates[7].position.y = 0;
+
 
     InitWindow(screenWidth, screenHeight, "plunge – game");
 
-    Camera2D camera = { 0 };
+    Camera2D camera = {0};
     camera.rotation = 0.0f;
     camera.zoom = 1.0f;
 
     SetTargetFPS(60);
 
     // MAIN LOOP ----------------------------------------------------------------------------------------//
-    while (!WindowShouldClose())        // Detect window close button or ESC key
+    while (!WindowShouldClose()) // Detect window close button or ESC key
     {
-        distance += 5;
+        distance += FALL_RATE;
 
         // add input to velocity
-        if (IsKeyDown(KEY_RIGHT)) {
-            if (playerShip.velocity.x < MAX_VELOCITY) playerShip.velocity.x += 1.5f;
-            if (playerShip.rotation > -60) playerShip.rotation -= 1.0f;
+        if (IsKeyDown(KEY_RIGHT))
+        {
+            if (playerShip.velocity.x < MAX_VELOCITY)
+                playerShip.velocity.x += 1.5f;
+            if (playerShip.rotation > -60)
+                playerShip.rotation -= 1.0f;
         }
-        if (IsKeyDown(KEY_LEFT)) {
-            if (playerShip.velocity.x > -MAX_VELOCITY) playerShip.velocity.x -= 1.5f;
-            if (playerShip.rotation < 60) playerShip.rotation += 1.0f;
+        if (IsKeyDown(KEY_LEFT))
+        {
+            if (playerShip.velocity.x > -MAX_VELOCITY)
+                playerShip.velocity.x -= 1.5f;
+            if (playerShip.rotation < 60)
+                playerShip.rotation += 1.0f;
         }
+        if (IsKeyPressed(KEY_SPACE))
+        {
+			if (IsWindowFullscreen())
+			{
+				ToggleFullscreen();
+				SetWindowSize(screenWidth, screenHeight);
+			}
+			else
+			{
+				int monitor = GetCurrentMonitor();
+				SetWindowSize(GetMonitorWidth(monitor), GetMonitorHeight(monitor));
+				ToggleFullscreen();
+			}
+		}
 
         // update player and gates
-        UpdateShip( &playerShip );
-        UpdateGate( &gates[0] );
-        
-        // check current gate for collisions
-        bool collision = checkCollision(&gates[0], &playerShip);
+        UpdateShip(&playerShip);
+        for (int i = 0; i < 8; i++)
+            UpdateGate(&gates[i]);
+        for (int i = 0; i < MAX_GATES; i++)
+            UpdateLine(&lines[i]);
 
-        // update score
-        if (collision && gates[0].belowPlayer) 
-        {
-            gates[0].hit = true;
-            gates[0].belowPlayer = false;
-            score--;
-        }
-        if (gates[0].position.y < playerShip.position.y && gates[0].belowPlayer)
-        {
-            gates[0].belowPlayer = false;
-            score++;
-        }
+        // check current gate for collisions
+        checkCollision(&gates[0], &playerShip);
 
         // DRAW FRAME
         BeginDrawing();
@@ -177,19 +181,26 @@ int main(void)
 
             BeginMode2D(camera);
 
-                DrawShip( &playerShip );
-                DrawGate( &gates[0] ); 
+                DrawRectangle(PLAY_PADDING, PLAY_PADDING, PLAY_WIDTH, PLAY_HEIGHT, DARKEST_GRAY);
 
-            EndMode2D();  
+                for (int i = 0; i < MAX_GATES; i++)
+                    DrawLineType(&lines[i]);
+                for (int i = 0; i < 8; i++)
+                    DrawGate(&gates[i]);
+                DrawShip(&playerShip);
+
+            EndMode2D();
+            
             DrawText(TextFormat("%000000009.0f M", distance), 450, 96, 36, WHITE);
             DrawText(TextFormat("SCORE: %d00", score), 450, 150, 36, WHITE);
-            DrawText(TextFormat("Collision: %s", collision ? "true" : "false"), 10, 10, 24, collision ? RED : WHITE);
+            // DEBUG
+            DrawText(TextFormat("FPS: %d", GetFPS()), 10, 10, 20, WHITE);
+            // DrawText(TextFormat("Collision: %s", collision ? "true" : "false"), 10, 10, 24, collision ? RED : WHITE);
 
         EndDrawing();
     }
 
     // De-Initialization ------------------------------------------------------------------------------------//
-    CloseWindow();        // Close window and OpenGL context
+    CloseWindow(); // Close window and OpenGL context
     return 0;
 }
-
